@@ -4,6 +4,7 @@ import { BookOpen, Compass, Sparkles, UserCheck } from "lucide-react";
 import { getSessionUser } from "@/lib/auth";
 import { query } from "@/lib/db";
 import { Navbar } from "@/components/Navbar";
+import { StudentDashboardClient } from "./StudentDashboardClient";
 
 export const dynamic = "force-dynamic";
 
@@ -70,21 +71,25 @@ export default async function StudentDashboardPage() {
           </div>
         </div>
 
-        <div className="grid gap-6 md:grid-cols-3">
-          <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-            <div className="flex items-center gap-2.5 text-indigo-600 dark:text-indigo-400">
-              <Sparkles className="h-5 w-5" />
-              <h2 className="font-semibold text-slate-900 dark:text-white">
-                Find a Mentor (Vector Search)
-              </h2>
-            </div>
-            <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">
-              Phase 3 will embed your natural-language query and retrieve the top
-              3 alumni mentors from Qdrant.
-            </p>
+        <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+          <div className="flex items-center gap-2.5 text-indigo-600 dark:text-indigo-400">
+            <Sparkles className="h-5 w-5" />
+            <h2 className="font-semibold text-slate-900 dark:text-white">
+              Find a Mentor (Semantic Search)
+            </h2>
           </div>
+          <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">
+            Describe what kind of mentor you&apos;re looking for in plain language —
+            your query is embedded with Gemini and matched against alumni bios in
+            Qdrant by cosine similarity.
+          </p>
+          <div className="mt-4">
+            <StudentDashboardClient mode="search" />
+          </div>
+        </section>
 
-          <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+        <div className="mt-6 grid gap-6 lg:grid-cols-2">
+          <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
             <div className="flex items-center gap-2.5 text-emerald-600 dark:text-emerald-400">
               <UserCheck className="h-5 w-5" />
               <h2 className="font-semibold text-slate-900 dark:text-white">
@@ -92,12 +97,15 @@ export default async function StudentDashboardPage() {
               </h2>
             </div>
             <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">
-              Phase 2 will wire atomic MySQL transactions &amp;{" "}
-              <code>Active_Mentorships_View</code> here.
+              Backed by atomic MySQL transactions &amp;{" "}
+              <code>Active_Mentorships_View</code>.
             </p>
-          </div>
+            <div className="mt-4">
+              <StudentDashboardClient mode="requests" />
+            </div>
+          </section>
 
-          <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+          <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
             <div className="flex items-center gap-2.5 text-violet-600 dark:text-violet-400">
               <BookOpen className="h-5 w-5" />
               <h2 className="font-semibold text-slate-900 dark:text-white">
@@ -105,10 +113,12 @@ export default async function StudentDashboardPage() {
               </h2>
             </div>
             <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">
-              Read verified alumni career advice tagged by technical skills and
-              industries.
+              Verified alumni career advice, searchable via MySQL FULLTEXT.
             </p>
-          </div>
+            <div className="mt-4">
+              <StudentDashboardClient mode="insights" />
+            </div>
+          </section>
         </div>
 
         <section className="mt-8 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
@@ -139,4 +149,3 @@ export default async function StudentDashboardPage() {
     </div>
   );
 }
-

@@ -2,6 +2,9 @@ import { redirect } from "next/navigation";
 import { BarChart3, ShieldCheck, Users } from "lucide-react";
 import { getSessionUser } from "@/lib/auth";
 import { Navbar } from "@/components/Navbar";
+import { VerificationQueue } from "@/components/admin/VerificationQueue";
+import { HubStats } from "@/components/admin/HubStats";
+import { AuditLog } from "@/components/admin/AuditLog";
 
 export const dynamic = "force-dynamic";
 
@@ -28,30 +31,22 @@ export default async function AdminDashboardPage() {
           </p>
         </div>
 
-        <div className="grid gap-6 md:grid-cols-3">
-          <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+        <div className="grid gap-6 lg:grid-cols-2">
+          <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
             <div className="flex items-center gap-2.5 text-indigo-600">
               <Users className="h-5 w-5" />
               <h2 className="font-semibold">User Verification Queue</h2>
             </div>
             <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">
-              Toggle <code>users.is_verified</code> in Phase 2 to trigger
-              automated audit logging into <code>admin_actions_log</code>.
+              Toggling <code>users.is_verified</code> triggers automated audit
+              logging into <code>admin_actions_log</code>.
             </p>
-          </div>
-
-          <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-            <div className="flex items-center gap-2.5 text-emerald-600">
-              <BarChart3 className="h-5 w-5" />
-              <h2 className="font-semibold">Stored Procedure Metrics</h2>
+            <div className="mt-4">
+              <VerificationQueue />
             </div>
-            <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">
-              Displays multi-result-set analytics from{" "}
-              <code>CALL sp_get_hub_stats()</code>.
-            </p>
-          </div>
+          </section>
 
-          <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+          <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
             <div className="flex items-center gap-2.5 text-violet-600">
               <ShieldCheck className="h-5 w-5" />
               <h2 className="font-semibold">Audit Trail</h2>
@@ -60,10 +55,25 @@ export default async function AdminDashboardPage() {
               Live feed of trigger-inserted records from{" "}
               <code>admin_actions_log</code>.
             </p>
-          </div>
+            <div className="mt-4">
+              <AuditLog />
+            </div>
+          </section>
         </div>
+
+        <section className="mt-6 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+          <div className="flex items-center gap-2.5 text-emerald-600">
+            <BarChart3 className="h-5 w-5" />
+            <h2 className="font-semibold">Stored Procedure Metrics</h2>
+          </div>
+          <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">
+            Multi-result-set analytics from <code>CALL sp_get_hub_stats()</code>.
+          </p>
+          <div className="mt-4">
+            <HubStats />
+          </div>
+        </section>
       </main>
     </div>
   );
 }
-

@@ -2,10 +2,41 @@ import fs from "node:fs";
 import path from "node:path";
 import bcrypt from "bcryptjs";
 import mysql, { ResultSetHeader, RowDataPacket } from "mysql2/promise";
+import { QdrantClient } from "@qdrant/js-client-rest";
 
 const envPath = path.resolve(process.cwd(), ".env.local");
 if (fs.existsSync(envPath) && typeof process.loadEnvFile === "function") {
   process.loadEnvFile(envPath);
+}
+
+/**
+ * Standalone (no "@/lib/*" alias) copy of the Phase 3 embedding call —
+ * this script runs outside the Next.js app via `tsx`, so it duplicates
+ * the small amount of logic in src/lib/embeddings.ts & src/lib/qdrant.ts
+ * rather than depending on bundler-only path resolution.
+ */
+async function embedTextStandalone(text: string): Promise<number[]> {
+  const apiKey = process.env.GEMINI_API_KEY;
+  const model = process.env.GEMINI_EMBEDDING_MODEL || "gemini-embedding-001";
+  const res = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/${model}:embedContent?key=${apiKey}`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: `models/${model}`,
+        content: { parts: [{ text }] },
+        taskType: "RETRIEVAL_DOCUMENT",
+        outputDimensionality: 768,
+      }),
+    }
+  );
+  if (!res.ok) {
+    throw new Error(`Gemini embedding failed (${res.status}): ${await res.text()}`);
+  }
+  const data = (await res.json()) as { embedding?: { values?: number[] } };
+  if (!data.embedding?.values) throw new Error("No embedding values returned.");
+  return data.embedding.values;
 }
 
 async function seed() {
@@ -207,6 +238,65 @@ async function seed() {
           }
         }
       }
+    }
+
+    // 4. Phase 3 — best-effort Qdrant sync for seeded mentors. Skipped
+    // entirely (not an error) when GEMINI_API_KEY / QDRANT_URL aren't set,
+    // so `npm run seed` keeps working for teams that haven't set up
+    // vector search yet.
+    if (process.env.GEMINI_API_KEY && process.env.QDRANT_URL) {
+      console.log("Embedding & indexing seeded mentors into Qdrant...");
+      const qdrant = new QdrantClient({
+        url: process.env.QDRANT_URL,
+        apiKey: process.env.QDRANT_API_KEY || undefined,
+      });
+      const collection = process.env.QDRANT_COLLECTION || "alumni_profiles";
+      const exists = await qdrant.collectionExists(collection);
+      if (!exists.exists) {
+        await qdrant.createCollection(collection, {
+          vectors: { size: 768, distance: "Cosine" },
+        });
+      }
+
+      for (const m of mentors) {
+        const [alRows] = await conn.execute<RowDataPacket[]>(
+          `SELECT alumni_id, user_id FROM alumni WHERE user_id = (SELECT user_id FROM users WHERE email = ?)`,
+          [m.email]
+        );
+        const alumni = alRows[0];
+        if (!alumni) continue;
+
+        const text = `Mentor: ${m.name}. Role: ${m.title} at ${m.company}. Industry: ${m.industry}. Expertise: ${m.skills.join(", ")}. Bio: ${m.bio}`;
+        try {
+          const vector = await embedTextStandalone(text);
+          await qdrant.upsert(collection, {
+            wait: true,
+            points: [
+              {
+                id: alumni.alumni_id,
+                vector,
+                payload: {
+                  alumni_id: alumni.alumni_id,
+                  user_id: alumni.user_id,
+                  name: m.name,
+                  current_company: m.company,
+                  job_title: m.title,
+                  industry: m.industry,
+                  skills: m.skills,
+                  bio: m.bio,
+                },
+              },
+            ],
+          });
+          console.log(`  Indexed vector for ${m.name}.`);
+        } catch (err) {
+          console.warn(`  Skipped vector for ${m.name}:`, (err as Error).message);
+        }
+      }
+    } else {
+      console.log(
+        "Skipping Qdrant sync (set GEMINI_API_KEY and QDRANT_URL in .env.local to enable semantic search)."
+      );
     }
 
     console.log("Seed completed successfully!");

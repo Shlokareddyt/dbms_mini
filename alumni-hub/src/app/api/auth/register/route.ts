@@ -8,6 +8,7 @@ import {
 } from "@/lib/auth";
 import { mapDatabaseError, withTransaction } from "@/lib/db";
 import { registerSchema } from "@/lib/validators";
+import { syncAlumniVector } from "@/lib/alumniSync";
 
 export async function POST(request: NextRequest) {
   try {
@@ -123,6 +124,14 @@ export async function POST(request: NextRequest) {
       },
       { status: 201 }
     );
+
+    // Phase 3: index the new mentor's bio into Qdrant. Best-effort — a
+    // missing GEMINI_API_KEY/QDRANT_URL must never block account creation.
+    if (sessionPayload.role === "alumni" && sessionPayload.alumniId) {
+      syncAlumniVector(sessionPayload.alumniId).catch((err) =>
+        console.error("[alumniSync] registration embed failed:", err)
+      );
+    }
 
     return attachSessionCookie(response, token);
   } catch (error) {

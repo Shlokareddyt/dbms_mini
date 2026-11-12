@@ -91,3 +91,103 @@ export const registerSchema = z.discriminatedUnion("role", [
   alumniRegisterSchema,
 ]);
 
+// ---------------------------------------------------------------------------
+// Phase 2 — Mentorship workflow validators
+// ---------------------------------------------------------------------------
+
+export const createMentorshipRequestSchema = z.object({
+  alumni_id: z.coerce.number().int().positive("A valid mentor must be selected."),
+  message: z
+    .string()
+    .trim()
+    .max(1000, "Message cannot exceed 1000 characters.")
+    .optional()
+    .default(""),
+  match_score: z.coerce.number().min(0).max(1).optional(),
+});
+
+export const updateMentorshipRequestSchema = z.object({
+  action: z.enum(["accept", "reject", "cancel", "complete"]),
+});
+
+export const createSessionSchema = z.object({
+  request_id: z.coerce.number().int().positive(),
+  scheduled_at: z.string().trim().min(1, "A scheduled date/time is required."),
+  duration_minutes: z.coerce
+    .number()
+    .int()
+    .min(15, "Sessions must be at least 15 minutes.")
+    .max(240, "Sessions cannot exceed 240 minutes.")
+    .default(30),
+  meeting_link: z
+    .string()
+    .trim()
+    .max(500, "Meeting link cannot exceed 500 characters.")
+    .optional()
+    .default(""),
+});
+
+export const updateSessionSchema = z.object({
+  status: z.enum(["scheduled", "completed", "cancelled"]).optional(),
+  notes: z.string().trim().max(2000).optional(),
+  scheduled_at: z.string().trim().optional(),
+  meeting_link: z.string().trim().max(500).optional(),
+});
+
+export const createFeedbackSchema = z.object({
+  session_id: z.coerce.number().int().positive(),
+  rating: z.coerce
+    .number()
+    .int()
+    .min(1, "Rating must be between 1 and 5.")
+    .max(5, "Rating must be between 1 and 5."),
+  comments: z
+    .string()
+    .trim()
+    .max(1500, "Comments cannot exceed 1500 characters.")
+    .optional()
+    .default(""),
+});
+
+export const createInsightSchema = z.object({
+  title: z
+    .string()
+    .trim()
+    .min(5, "Title must be at least 5 characters.")
+    .max(200, "Title cannot exceed 200 characters."),
+  content: z
+    .string()
+    .trim()
+    .min(30, "Content must be at least 30 characters.")
+    .max(8000, "Content cannot exceed 8000 characters."),
+  skill_ids: z.array(z.number().int().positive()).optional().default([]),
+});
+
+export const updateAlumniProfileSchema = z.object({
+  current_company: z.string().trim().min(2).max(150).optional(),
+  job_title: z.string().trim().min(2).max(150).optional(),
+  industry: z.string().trim().min(2).max(100).optional(),
+  bio: z.string().trim().min(15).max(3000).optional(),
+  mentee_capacity: z.coerce.number().int().min(0).max(20).optional(),
+  skill_ids: z.array(z.number().int().positive()).optional(),
+});
+
+export const updateStudentProfileSchema = z.object({
+  major: z.string().trim().min(2).max(100).optional(),
+  grad_year: z.coerce.number().int().min(2020).max(2035).optional(),
+  bio: z.string().trim().max(2000).optional(),
+  career_goals: z.string().trim().max(2000).optional(),
+  skill_ids: z.array(z.number().int().positive()).optional(),
+});
+
+export const semanticSearchSchema = z.object({
+  query: z
+    .string()
+    .trim()
+    .min(5, "Describe what kind of mentor you're looking for (at least 5 characters)."),
+  top_k: z.coerce.number().int().min(1).max(10).optional().default(3),
+});
+
+export const verifyUserSchema = z.object({
+  is_verified: z.boolean(),
+});

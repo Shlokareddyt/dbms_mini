@@ -77,6 +77,24 @@ export async function execute(
   return result;
 }
 
+/**
+ * Calls a stored procedure that returns multiple result sets
+ * (e.g. `sp_get_hub_stats`). mysql2's *prepared-statement* `execute()`
+ * API does not support multi-result-set CALL responses, so this uses
+ * the plain text-protocol `query()` instead and returns each SELECT's
+ * rows as one entry in the returned array (the trailing OkPacket mysql2
+ * appends for the CALL itself is filtered out).
+ */
+export async function callProcedure<T extends RowDataPacket[] = RowDataPacket[]>(
+  sql: string,
+  params: Array<string | number | boolean | null> = []
+): Promise<T[]> {
+  const pool = getPool();
+  const [results] = await pool.query<RowDataPacket[][]>(sql, params);
+  if (!Array.isArray(results)) return [];
+  return results.filter((set) => Array.isArray(set)) as T[];
+}
+
 export async function withTransaction<T>(
   fn: (conn: PoolConnection) => Promise<T>
 ): Promise<T> {

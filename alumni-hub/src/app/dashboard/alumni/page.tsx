@@ -4,6 +4,7 @@ import { Briefcase, CalendarCheck, FileText, Users } from "lucide-react";
 import { getSessionUser } from "@/lib/auth";
 import { query } from "@/lib/db";
 import { Navbar } from "@/components/Navbar";
+import { AlumniDashboardClient } from "./AlumniDashboardClient";
 
 export const dynamic = "force-dynamic";
 
@@ -19,12 +20,17 @@ interface AlumniProfileRow extends RowDataPacket {
   is_verified: number | boolean;
 }
 
+interface SkillIdRow extends RowDataPacket {
+  skill_id: number;
+}
+
 export default async function AlumniDashboardPage() {
   const user = await getSessionUser();
   if (!user) redirect("/login");
   if (user.role !== "alumni") redirect(`/dashboard/${user.role}`);
 
   let profile: AlumniProfileRow | null = null;
+  let skillIds: number[] = [];
   try {
     const rows = await query<AlumniProfileRow[]>(
       `SELECT
@@ -44,6 +50,14 @@ export default async function AlumniDashboardPage() {
       [user.userId]
     );
     profile = rows[0] ?? null;
+
+    if (profile) {
+      const skillRows = await query<SkillIdRow[]>(
+        `SELECT skill_id FROM alumni_expertise WHERE alumni_id = ?`,
+        [profile.alumni_id]
+      );
+      skillIds = skillRows.map((r) => r.skill_id);
+    }
   } catch {
     profile = null;
   }
@@ -80,8 +94,8 @@ export default async function AlumniDashboardPage() {
           </div>
         </div>
 
-        <div className="grid gap-6 md:grid-cols-3">
-          <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+        <div className="grid gap-6 lg:grid-cols-2">
+          <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
             <div className="flex items-center gap-2.5 text-indigo-600 dark:text-indigo-400">
               <Users className="h-5 w-5" />
               <h2 className="font-semibold text-slate-900 dark:text-white">
@@ -89,12 +103,15 @@ export default async function AlumniDashboardPage() {
               </h2>
             </div>
             <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">
-              Phase 2 will let you accept/reject mentorship requests and schedule
-              1:1 sessions inside transactions.
+              Accept/reject requests and schedule 1:1 sessions inside atomic
+              transactions.
             </p>
-          </div>
+            <div className="mt-4">
+              <AlumniDashboardClient mode="requests" />
+            </div>
+          </section>
 
-          <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+          <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
             <div className="flex items-center gap-2.5 text-emerald-600 dark:text-emerald-400">
               <FileText className="h-5 w-5" />
               <h2 className="font-semibold text-slate-900 dark:text-white">
@@ -105,33 +122,51 @@ export default async function AlumniDashboardPage() {
               Share industry trends and interview guidance linked with skill tags
               in <code>career_insights</code>.
             </p>
-          </div>
-
-          <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-            <div className="flex items-center gap-2.5 text-violet-600 dark:text-violet-400">
-              <Briefcase className="h-5 w-5" />
-              <h2 className="font-semibold text-slate-900 dark:text-white">
-                Bio &amp; Vector Sync
-              </h2>
+            <div className="mt-4">
+              <AlumniDashboardClient mode="publish" />
             </div>
-            <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">
-              Phase 3 will automatically re-embed your bio and industry into
-              Qdrant whenever you update your mentor profile.
-            </p>
-          </div>
+          </section>
         </div>
 
-        <section className="mt-8 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+        <section className="mt-6 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+          <div className="flex items-center gap-2.5 text-violet-600 dark:text-violet-400">
+            <Briefcase className="h-5 w-5" />
+            <h2 className="font-semibold text-slate-900 dark:text-white">
+              Mentor Profile &amp; Vector Sync
+            </h2>
+          </div>
+          <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">
+            Editing your bio, role, industry, or skills automatically re-embeds
+            your profile and upserts it into Qdrant so student search results
+            stay in sync.
+          </p>
+          {profile && (
+            <div className="mt-4">
+              <AlumniDashboardClient
+                mode="profile"
+                initialProfile={{
+                  currentCompany: profile.current_company || "",
+                  jobTitle: profile.job_title || "",
+                  industry: profile.industry || "",
+                  bio: profile.bio || "",
+                  menteeCapacity: profile.mentee_capacity,
+                  skillIds,
+                }}
+              />
+            </div>
+          )}
+        </section>
+
+        <section className="mt-6 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
           <div className="flex items-center gap-2 text-slate-900 dark:text-white">
             <CalendarCheck className="h-5 w-5 text-indigo-600" />
-            <h2 className="text-base font-semibold">Mentor Profile Summary</h2>
+            <h2 className="text-base font-semibold">My Career Insights</h2>
           </div>
-          <p className="mt-3 text-sm leading-relaxed text-slate-700 dark:text-slate-300">
-            {profile?.bio || "No bio set yet."}
-          </p>
+          <div className="mt-4">
+            <AlumniDashboardClient mode="myInsights" currentUserName={user.name} />
+          </div>
         </section>
       </main>
     </div>
   );
 }
-
