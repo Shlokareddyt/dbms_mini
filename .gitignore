@@ -1,0 +1,16 @@
+# Dependencies & build outputs
+node_modules/
+.next/
+out/
+build/
+
+# Environment secrets (never commit .env.local)
+.env
+.env.local
+.env.*.local
+
+# OS & editor artifacts
+.DS_Store
+Thumbs.db
+*.log
+
