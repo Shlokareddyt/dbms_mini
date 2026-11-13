@@ -242,60 +242,71 @@ async function seed() {
 
     // 4. Phase 3 — best-effort Qdrant sync for seeded mentors. Skipped
     // entirely (not an error) when GEMINI_API_KEY / QDRANT_URL aren't set,
-    // so `npm run seed` keeps working for teams that haven't set up
-    // vector search yet.
-    if (process.env.GEMINI_API_KEY && process.env.QDRANT_URL) {
-      console.log("Embedding & indexing seeded mentors into Qdrant...");
-      const qdrant = new QdrantClient({
-        url: process.env.QDRANT_URL,
-        apiKey: process.env.QDRANT_API_KEY || undefined,
-      });
-      const collection = process.env.QDRANT_COLLECTION || "alumni_profiles";
-      const exists = await qdrant.collectionExists(collection);
-      if (!exists.exists) {
-        await qdrant.createCollection(collection, {
-          vectors: { size: 768, distance: "Cosine" },
+    // or when Qdrant is offline.
+    const isGeminiConfigured =
+      Boolean(process.env.GEMINI_API_KEY) &&
+      process.env.GEMINI_API_KEY !== "your_gemini_api_key_here";
+
+    if (isGeminiConfigured && process.env.QDRANT_URL) {
+      try {
+        console.log("Embedding & indexing seeded mentors into Qdrant...");
+        const qdrant = new QdrantClient({
+          url: process.env.QDRANT_URL,
+          apiKey: process.env.QDRANT_API_KEY || undefined,
+          checkCompatibility: false,
         });
-      }
-
-      for (const m of mentors) {
-        const [alRows] = await conn.execute<RowDataPacket[]>(
-          `SELECT alumni_id, user_id FROM alumni WHERE user_id = (SELECT user_id FROM users WHERE email = ?)`,
-          [m.email]
-        );
-        const alumni = alRows[0];
-        if (!alumni) continue;
-
-        const text = `Mentor: ${m.name}. Role: ${m.title} at ${m.company}. Industry: ${m.industry}. Expertise: ${m.skills.join(", ")}. Bio: ${m.bio}`;
-        try {
-          const vector = await embedTextStandalone(text);
-          await qdrant.upsert(collection, {
-            wait: true,
-            points: [
-              {
-                id: alumni.alumni_id,
-                vector,
-                payload: {
-                  alumni_id: alumni.alumni_id,
-                  user_id: alumni.user_id,
-                  name: m.name,
-                  current_company: m.company,
-                  job_title: m.title,
-                  industry: m.industry,
-                  skills: m.skills,
-                  bio: m.bio,
-                },
-              },
-            ],
+        const collection = process.env.QDRANT_COLLECTION || "alumni_profiles";
+        const exists = await qdrant.collectionExists(collection);
+        if (!exists.exists) {
+          await qdrant.createCollection(collection, {
+            vectors: { size: 768, distance: "Cosine" },
           });
-          console.log(`  Indexed vector for ${m.name}.`);
-        } catch (err) {
-          console.warn(`  Skipped vector for ${m.name}:`, (err as Error).message);
         }
+
+        for (const m of mentors) {
+          const [alRows] = await conn.execute<RowDataPacket[]>(
+            `SELECT alumni_id, user_id FROM alumni WHERE user_id = (SELECT user_id FROM users WHERE email = ?)`,
+            [m.email]
+          );
+          const alumni = alRows[0];
+          if (!alumni) continue;
+
+          const text = `Mentor: ${m.name}. Role: ${m.title} at ${m.company}. Industry: ${m.industry}. Expertise: ${m.skills.join(", ")}. Bio: ${m.bio}`;
+          try {
+            const vector = await embedTextStandalone(text);
+            await qdrant.upsert(collection, {
+              wait: true,
+              points: [
+                {
+                  id: alumni.alumni_id,
+                  vector,
+                  payload: {
+                    alumni_id: alumni.alumni_id,
+                    user_id: alumni.user_id,
+                    name: m.name,
+                    current_company: m.company,
+                    job_title: m.title,
+                    industry: m.industry,
+                    skills: m.skills,
+                    bio: m.bio,
+                  },
+                },
+              ],
+            });
+            console.log(`  Indexed vector for ${m.name}.`);
+          } catch (err) {
+            console.warn(`  Skipped vector for ${m.name}:`, (err as Error).message);
+          }
+        }
+      } catch (err) {
+        console.warn(
+          "  Skipping Qdrant sync (vector DB offline or unreachable):",
+          (err as Error).message
+        );
       }
     } else {
       console.log(
-        "Skipping Qdrant sync (set GEMINI_API_KEY and QDRANT_URL in .env.local to enable semantic search)."
+        "Skipping Qdrant sync (set a valid GEMINI_API_KEY and QDRANT_URL in .env.local to enable semantic search)."
       );
     }
 
